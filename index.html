@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>السوق Sentinel AR - Static Risk Analysis Platform</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        success: '#22c55e',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        accent: '#8b5cf6',
+                        bglight: '#F6F7FB'
+                    },
+                    fontFamily: {
+                        arabic: ['Cairo', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link href="css/theme.css" rel="stylesheet"/>
+</head>
+<body class="bg-bglight font-arabic text-gray-800 antialiased min-h-screen flex flex-col">
+<header class="bg-white shadow-md border-b border-gray-200 sticky top-0 z-50">
+<div class="container mx-auto px-4 h-16 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<h1 class="text-2xl font-bold text-gray-900">السوق Sentinel <span class="text-primary">AR</span></h1>
+<div class="hidden text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full" id="breadcrumb"></div>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-xs bg-accent text-white px-2 py-1 rounded-md" id="version-badge"></span>
+<button class="text-sm text-gray-500 hover:text-danger transition-colors" id="btn-reset">إعادة ضبط</button>
+</div>
+</div>
+<div class="container mx-auto px-4">
+<nav class="flex space-x-1 space-x-reverse overflow-x-auto pb-1" id="main-tabs">
+<button class="tab-btn active border-b-2 border-primary text-primary font-semibold px-4 py-2" data-target="view-dashboard">لوحة المتابعة</button>
+<button class="tab-btn text-gray-500 hover:text-gray-700 px-4 py-2" data-target="view-radar">الرادار</button>
+<button class="tab-btn text-gray-500 hover:text-gray-700 px-4 py-2" data-target="view-data">البيانات والإعدادات</button>
+<button class="tab-btn text-gray-500 hover:text-gray-700 px-4 py-2" data-target="view-screener">فرز الأسهم</button>
+
+
+
+<button class="tab-btn text-gray-500 hover:text-gray-700 px-4 py-2" data-target="view-smartmoneypro">Smart Money Pro</button>
+
+
+
+
+<button class="tab-btn text-gray-500 hover:text-gray-700 px-4 py-2" data-target="view-portfolioRadar">رادار المحفظة</button>
+
+
+
+
+<button class="tab-btn text-gray-500 hover:text-gray-700 px-4 py-2" data-target="view-riskcontrols">إدارة المخاطر</button>
+
+<button class="tab-btn text-gray-500 hover:text-gray-700 px-4 py-2" data-target="view-liquiditytrap">فخ السيولة</button>
+
+<button class="tab-btn text-gray-500 hover:text-gray-700 px-4 py-2 hidden" data-target="view-details" id="tab-details">التحليل والتفاصيل</button>
+</nav>
+</div>
+</header>
+<main class="flex-grow container mx-auto px-4 py-6" id="main-content">
+<div class="view-section active animate-fade-in" id="view-dashboard">
+<div class="flex justify-between items-center mb-6 gap-2 flex-wrap">
+<div class="bg-white border border-gray-200 rounded-2xl p-4 mb-6">
+<div class="flex flex-col lg:flex-row lg:items-end gap-3">
+<div class="flex-1">
+<div class="text-lg font-bold mb-1">📡 جلب بيانات مباشرة</div>
+<div class="text-xs text-gray-500">اكتب رمز السهم ثم اضغط "جلب وتحليل". يدعم AAPL و TSLA و 2222 أو 2222.SR.</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-2 w-full lg:w-auto">
+<input class="border rounded-xl p-2" id="quick-symbol" placeholder="رمز السهم"/>
+<input id="portfolio-symbol" type="hidden" value=""/>
+<select class="border rounded-xl p-2" id="fetchlive-range">
+<option value="1mo">1 شهر</option>
+<option value="3mo">3 أشهر</option>
+<option selected="" value="6mo">6 أشهر</option>
+<option value="1y">1 سنة</option>
+<option value="2y">سنتان</option>
+</select>
+<select class="border rounded-xl p-2" id="fetchlive-interval">
+<option selected="" value="1d">يومي</option>
+<option value="1wk">أسبوعي</option>
+<option value="1mo">شهري</option>
+</select>
+<button class="px-4 py-2 rounded-xl bg-black text-white" id="btn-fetch-live">جلب وتحليل</button>
+</div>
+</div>
+<div class="mt-3 text-sm border rounded-xl p-3 bg-gray-50 border-gray-200 text-gray-700" id="fetchlive-status">
+    اكتب الرمز واضبط Proxy من الإعدادات إن لزم، ثم اضغط "جلب وتحليل".
+  </div>
+</div>
+<h2 class="text-3xl font-bold">الأسهم المحللة</h2>
+<div class="flex gap-2">
+<button class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl border border-gray-200 transition-colors" id="dashboard-clear-all">
+                        مسح الكل
+                    </button>
+<button class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-xl shadow transition-colors" onclick="ui.switchTab('view-data')">
+                        + تحليل سهم جديد
+                    </button>
+</div>
+</div>
+<!-- 🔎 تحليل فوري (US + SA) -->
+<div class="bg-white p-4 rounded-2xl shadow-md border border-gray-100 mb-6">
+<div class="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+<div class="flex-1">
+<label class="block text-sm font-medium text-gray-700 mb-2">تحليل فوري (US + SA)</label>
+<div class="flex flex-col sm:flex-row gap-2">
+<input class="flex-1 border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" id="dashboard-symbol-input" placeholder="مثال: AAPL أو 2222 أو 2222.SR"/>
+<select class="border border-gray-200 rounded-xl px-3 py-2 bg-white" id="dashboard-range">
+<option value="1mo">شهر</option>
+<option value="3mo">3 أشهر</option>
+<option selected="" value="6mo">6 أشهر</option>
+<option value="1y">سنة</option>
+</select>
+<button class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-xl shadow transition-colors" id="dashboard-btn-analyze">
+          حلّل الآن
+        </button>
+</div>
+<div class="text-xs text-gray-500 mt-2">
+        ملاحظة: الجلب المباشر يحتاج بروكسي (Cloudflare عامل (Worker)) من تبويب "البيانات والإعدادات". أو ارفع CSV يدويًا.
+      </div>
+</div>
+<div class="flex gap-2">
+<button class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl border border-gray-200 transition-colors" id="dashboard-btn-go-data">
+        إعدادات البيانات
+      </button>
+</div>
+</div>
+</div>
+<!-- 🧠 مؤشر المخاطر الشامل (Unified Score) -->
+<div class="bg-white p-4 rounded-2xl shadow-md border border-gray-100 mb-6" id="globalRiskScore-card">
+<div class="flex items-center justify-between gap-3 flex-wrap">
+<div>
+<div class="text-xl font-bold">🧠 مؤشر المخاطر الشامل</div>
+<div class="text-xs text-gray-500">درجة واحدة (0–100) تلخص نتائج جميع المحركات + تفسير مختصر</div>
+</div>
+<div class="text-xs text-gray-500">يعتمد على آخر تحليل تم تشغيله</div>
+</div>
+<div class="mt-4" id="globalRiskScore-box"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" id="dashboard-cards">
+<!-- Cards injected here -->
+</div>
+</div>
+<div class="view-section hidden" id="view-data">
+<h2 class="text-3xl font-bold mb-6">البيانات والإعدادات</h2>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+<div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100">
+<h3 class="text-lg font-semibold mb-4 text-primary">تحميل بيانات تاريخية</h3>
+<div class="mb-4">
+<label class="block text-sm font-medium text-gray-700 mb-2">رفع ملف (CSV)</label>
+<input accept=".csv,.json,.xls,.xlsx,text/csv,application/json,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700 border border-gray-300 rounded-md" id="file-upload" type="file"/>
+</div>
+<div class="mb-4">
+<label class="block text-sm font-medium text-gray-700 mb-2">لصق CSV مباشرة</label>
+<textarea class="w-full border border-gray-300 rounded-md p-2 text-left" dir="ltr" id="csv-paste" placeholder="Date,فتح,مرتفع,منخفض,إغلاق,حجم التداول..." rows="4"></textarea>
+<button class="mt-2 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-md text-sm" id="btn-parse-paste">تحليل النص</button>
+</div>
+<div class="mb-4 border-t pt-4">
+<label class="block text-sm font-medium text-gray-700 mb-2">عينة جاهزة للتجربة</label>
+<div class="flex gap-2">
+<select class="border border-gray-300 rounded-md p-2 flex-grow" id="sample-select">
+<option value="datasets/sample_2222.csv">أرامكو (2222.SR)</option>
+<option value="datasets/sample_aapl.csv">Apple (AAPL)</option>
+</select>
+<button class="bg-gray-800 text-white px-4 py-2 rounded-md" id="btn-load-sample">تحميل</button>
+</div>
+</div>
+</div>
+<div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100">
+<h3 class="text-lg font-semibold mb-4 text-primary">جلب البيانات تلقائياً (بروكسي)</h3>
+<p class="text-sm text-gray-600 mb-4">
+                        يعمل عبر Cloudflare عامل (Worker) بروكسي لتجاوز CORS. أدخل رابط الـ بروكسي مرة واحدة ثم اكتب رمز السهم.
+                    </p>
+<div class="mb-3">
+<label class="block text-sm font-medium text-gray-700 mb-2">بروكسي URL (Cloudflare عامل (Worker))</label>
+<input class="w-full border border-gray-300 rounded-md p-2 text-left" dir="ltr" id="proxy-url" placeholder="https://your-worker.workers.dev" type="text"/>
+<button class="mt-2 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-md text-sm" id="btn-save-proxy">حفظ رابط الـ بروكسي</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2">رمز السهم</label>
+<input class="w-full border border-gray-300 rounded-md p-2 text-left" dir="ltr" id="fetch-symbol" placeholder="AAPL أو 2222.SR" type="text"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2">المدى</label>
+<select class="w-full border border-gray-300 rounded-md p-2" id="fetch-range">
+<option value="1mo">شهر</option>
+<option value="3mo">٣ أشهر</option>
+<option selected="" value="6mo">٦ أشهر</option>
+<option value="1y">سنة</option>
+<option value="2y">2 Years</option>
+<option value="5y">5 Years</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2">Interval</label>
+<select class="w-full border border-gray-300 rounded-md p-2" id="fetch-interval">
+<option selected="" value="1d">يوم</option>
+<option value="1wk">أسبوع</option>
+</select>
+</div>
+</div>
+<button class="mt-4 w-full bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md" id="btn-fetch-data">
+                        جلب البيانات (ياهو عبر بروكسي)
+                    </button>
+<div class="mt-3 text-sm text-gray-600" id="fetch-status"></div>
+</div>
+<div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100 flex flex-col">
+<h3 class="text-lg font-semibold mb-4 text-primary">البيانات الحالية</h3>
+<div class="flex-grow flex flex-col justify-center items-center text-gray-500 text-center bg-gray-50 rounded-xl p-4 border border-dashed border-gray-300" id="data-summary">
+                        لم يتم تحميل أي بيانات
+                    </div>
+<div class="mt-6 space-y-3">
+<input class="w-full border p-2 rounded-md mb-2" id="symbol-input" placeholder="رمز السهم (مثال: 2222)" type="text"/>
+<button class="w-full bg-success hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl" disabled="" id="btn-run-analysis">
+                            تشغيل التحليل
+                        </button>
+</div>
+<!-- ✅ طبقات متقدمة (Static / يدوي) -->
+<div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100">
+<h3 class="text-lg font-semibold mb-2 text-primary">طبقات متقدمة (Static/يدوي)</h3>
+<p class="text-sm text-gray-600 mb-4">هذه الطبقات تُستخدم لتحسين <b>الأسباب</b> ودقة التصنيف بدون سيرفر. تُحفظ لكل سهم في الجهاز فقط.</p>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2">اتجاه الأرباح (نمو الأرباح)</label>
+<select class="w-full border border-gray-300 rounded-md p-2" id="ml-earnings">
+<option selected="" value="unknown">غير متاح</option>
+<option value="improving">تحسّن</option>
+<option value="flat">ثابت</option>
+<option value="declining">تدهور</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2">Sector (اختياري)</label>
+<select class="w-full border border-gray-300 rounded-md p-2" id="ml-sector">
+<option selected="" value="">—</option>
+<option value="TECH">TECH</option>
+<option value="FINANCIALS">FINANCIALS</option>
+<option value="ENERGY">ENERGY</option>
+<option value="HEALTHCARE">HEALTHCARE</option>
+<option value="BANKS">BANKS</option>
+<option value="MATERIALS">MATERIALS</option>
+</select>
+</div>
+<div class="md:col-span-2">
+<label class="block text-sm font-medium text-gray-700 mb-2">مقارنة القطاع (تقييم مقابل القطاع) %</label>
+<input class="w-full border border-gray-300 rounded-md p-2 text-left" dir="ltr" id="ml-sector-delta" placeholder="مثال: +20 يعني أعلى من القطاع، -15 يعني أقل من القطاع" type="number"/>
+<div class="text-xs text-gray-500 mt-1">النطاق المقترح: من -50 إلى +50</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2">درجة الضجيج (0-100)</label>
+<input class="w-full border border-gray-300 rounded-md p-2 text-left" dir="ltr" id="ml-hype" placeholder="مثال: 70" type="number"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2">حدة الأخبار (0-100)</label>
+<input class="w-full border border-gray-300 rounded-md p-2 text-left" dir="ltr" id="ml-news" placeholder="مثال: 60" type="number"/>
+</div>
+</div>
+<div class="flex flex-wrap gap-2 mt-4">
+<button class="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-md text-sm" id="btn-ml-load">تحميل قيم السهم الحالي</button>
+<button class="bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm" id="btn-ml-save">حفظ</button>
+<button class="bg-danger hover:opacity-90 text-white px-4 py-2 rounded-md text-sm" id="btn-ml-clear">مسح</button>
+</div>
+<div class="text-xs text-gray-500 mt-2">مهم: هذه القيم تؤثر على درجة الثقة وتظهر داخل <b>الأسباب</b> (Top 5) في بطاقة القرار.</div>
+</div>
+</div>
+</div>
+</div>
+<div class="view-section" id="view-screener">
+<div class="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+<div>
+<h2 class="text-2xl font-bold text-gray-800">فرز مجموعة أسهم عند الأزمات</h2>
+<p class="text-sm text-gray-500 mt-1">
+                            ارفع ملفًا يحتوي على أعمدة: <b>symbol,date,فتح,high,low,close,volume</b> (و <b>beta</b> اختياري).
+                        </p>
+</div>
+<div class="text-xs text-gray-400">
+                        * هذا تصنيف سلوك/مخاطر (ليس توصية شراء/بيع)
+                    </div>
+</div>
+<div class="flex flex-wrap items-center gap-2 mb-4">
+<input accept=".csv,.json,.txt,.xlsx,.xls" class="block text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" id="screenerFile" multiple="" type="file"/>
+<button class="bg-primary text-white px-4 py-2 rounded-xl hover:opacity-90 transition" id="btnRunScreener">تشغيل الفرز</button>
+<button class="bg-gray-100 text-gray-700 px-4 py-2 rounded-xl hover:bg-gray-200 transition" id="btnExportScreener">تصدير النتائج JSON</button>
+</div>
+<div class="text-sm text-gray-600 mb-4" id="screenerStatus">يمكنك رفع ملف واحد متعدد الأسهم أو عدة ملفات، ملف لكل سهم.</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+<div class="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+<div class="flex items-center justify-between mb-2">
+<h3 class="font-bold text-gray-800">فئة (أ)</h3>
+<span class="text-xs text-gray-500">سريعة الهبوط وسريعة الارتداد</span>
+</div>
+<div id="screenerTableA"></div>
+</div>
+<div class="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+<div class="flex items-center justify-between mb-2">
+<h3 class="font-bold text-gray-800">فئة (ب)</h3>
+<span class="text-xs text-gray-500">بطيئة الهبوط ومستقرة</span>
+</div>
+<div id="screenerTableB"></div>
+</div>
+<div class="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+<div class="flex items-center justify-between mb-2">
+<h3 class="font-bold text-gray-800">فئة (ج)</h3>
+<span class="text-xs text-gray-500">تهبط ولا ترتد سريعًا</span>
+</div>
+<div id="screenerTableC"></div>
+</div>
+</div>
+</div>
+</div>
+
+
+
+<div class="view-section hidden animate-fade-in" id="view-smartmoneypro">
+<div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-6">
+<h2 class="text-3xl font-bold mb-2">Smart Money Pro (لحظي)</h2>
+<p class="text-gray-600 text-sm mb-4">يعمل عند توفر بيانات لحظية (Intraday). إذا كانت البيانات يومية فقط، سيظهر أنه غير متاح.</p>
+<div class="p-4 rounded-xl bg-gray-50 border border-gray-200" id="smpro-box"></div>
+</div>
+</div>
+
+
+
+
+<div class="view-section hidden animate-fade-in" id="view-portfolioRadar">
+<div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-6">
+<h2 class="text-3xl font-bold mb-2">رادار المحفظة (Portfolio Radar)</h2>
+<p class="text-gray-600 text-sm mb-4">تقييم تجميعي مبني على آخر التحليلات التي قمت بها. (لا يحتاج قاعدة بيانات).</p>
+<div class="p-4 rounded-xl bg-gray-50 border border-gray-200" id="portfolio-radar-box"></div>
+<div class="mt-4 text-xs text-gray-500">ملاحظة: يتم تحديثه تلقائيًا بعد كل عملية تحليل.</div>
+</div>
+</div>
+
+
+
+
+<div class="view-section hidden animate-fade-in" id="view-riskcontrols">
+<div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-6">
+<h2 class="text-3xl font-bold mb-2">إدارة المخاطر (Peace of Mind Pack)</h2>
+<p class="text-gray-600 text-sm mb-4">قسم خاص يترجم نتائج المحركات إلى “ضوابط حماية” + قائمة تحقق طمأنينة + حد خسارة إرشادي بصيغة غير ملزمة.</p>
+<div class="p-4 rounded-xl bg-gray-50 border border-gray-200" id="riskcontrols-box"></div>
+</div>
+</div>
+
+<div class="view-section hidden animate-fade-in" id="view-liquiditytrap">
+<div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-6">
+<h2 class="text-3xl font-bold mb-2">كاشف فخ السيولة (Liquidity Trap Detector)</h2>
+<p class="text-gray-600 text-sm mb-4">قسم خاص لكشف "سيولة مضللة" قد تسبق تصريفًا أو هبوطًا سريعًا عبر دمج: حجم غير طبيعي + تمدد سعري + شموع انعكاسية + Iceberg + إشارات السيولة الذكية.</p>
+<div class="p-4 rounded-xl bg-gray-50 border border-gray-200" id="liquiditytrap-box"></div>
+</div>
+</div>
+<div class="view-section hidden animate-fade-in" id="view-radar">
+<div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-6">
+<h2 class="text-3xl font-bold mb-2">🛰️ رادار السوق (Market Radar)</h2>
+<p class="text-gray-600 text-sm mb-4">يعرض أفضل/أخطر الأسهم بناءً على آخر التحليلات المحفوظة محلياً + ملخص السيولة الذكية + ملخص القطاعات (من حارس المحفظة). لا يوجد جلب بيانات — Static بالكامل.</p>
+<div class="p-2" id="market-radar-box"></div>
+</div>
+</div>
+<div class="view-section hidden" id="view-details">
+<div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-6 flex justify-between items-center">
+<div>
+<h2 class="text-3xl font-bold" id="detail-symbol">SYMBOL</h2>
+<p class="text-gray-500 text-sm" id="detail-meta"></p>
+</div>
+</div>
+<div class="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 mb-4">
+<div class="flex flex-wrap gap-2" id="details-subtabs">
+<button class="px-3 py-2 rounded-xl border text-sm bg-gray-900 text-white" data-sub="d-decision">القرار النهائي</button>
+<button class="px-3 py-2 rounded-xl border text-sm" data-sub="d-tech">المؤشرات الفنية</button>
+<button class="px-3 py-2 rounded-xl border text-sm" data-sub="d-liq">السيولة والسياق</button>
+<button class="px-3 py-2 rounded-xl border text-sm" data-sub="d-chart">الرسم البياني</button>
+<button class="px-3 py-2 rounded-xl border text-sm" data-sub="d-alerts">التنبيهات</button>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<div class="lg:col-span-1 space-y-6">
+<div class="details-section" id="d-decision"><div class="bg-white p-6 rounded-2xl shadow-md border-2" id="decision-card">
+<div class="text-center mb-4">
+<div class="text-sm text-gray-500 mb-1">قرار إدارة المخاطر المقترح</div>
+<div class="text-3xl font-bold" id="decision-label">-</div>
+</div>
+<div class="flex items-center justify-center gap-4 mb-4">
+<div class="text-center">
+<div class="text-4xl font-bold" id="trust-score-val">0</div>
+<div class="text-xs text-gray-500">درجة الثقة</div>
+</div>
+<div class="w-12 h-12 rounded-full flex items-center justify-center text-3xl" id="trust-light">⚪</div>
+</div>
+<div class="bg-gray-50 p-3 rounded-xl text-sm space-y-1" id="decision-reasons"></div>
+</div><div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200">
+<h3 class="font-bold mb-3">الحفظ والتصدير</h3>
+<div class="flex flex-wrap gap-2">
+<button class="bg-primary text-white px-4 py-2 rounded-xl hover:opacity-90" id="saveAnalysisButton">حفظ التحليل</button>
+<button class="bg-accent text-white px-4 py-2 rounded-xl hover:opacity-90" id="btnExportAnalysis">تصدير JSON</button>
+<button class="bg-gray-200 text-gray-800 px-4 py-2 rounded-xl hover:bg-gray-300" id="btnClearHistory">مسح السجل</button>
+</div>
+<div class="text-xs text-gray-500 mt-3">يتم حفظ آخر 50 تحليلًا محليًا داخل جهازك (LocalStorage).</div>
+<div class="mt-4" id="analysisHistory"></div>
+</div></div><div class="details-section hidden" id="d-tech"><div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100">
+<h4 class="font-bold mb-3 border-b pb-2">مؤشرات فنية</h4>
+<div class="space-y-3 text-sm">
+<div class="flex justify-between"><span class="text-gray-600">RSI (14):</span><span class="font-bold text-left" dir="ltr" id="ind-rsi">-</span></div>
+<div class="flex justify-between"><span class="text-gray-600">Bollinger Pos:</span><span class="font-bold text-left" dir="ltr" id="ind-bbpos">-</span></div>
+<div class="flex justify-between"><span class="text-gray-600">MACD / Signal / Hist:</span><span class="font-bold text-left" dir="ltr" id="ind-macd">-</span></div>
+<div class="flex justify-between"><span class="text-gray-600">حجم التداول Ratio (20):</span><span class="font-bold text-left" dir="ltr" id="ind-volratio">-</span></div>
+<div class="flex justify-between"><span class="text-gray-600">MFI (14):</span><span class="font-bold text-left" dir="ltr" id="ind-mfi">-</span></div>
+<div class="flex justify-between"><span class="text-gray-600">CMF (20):</span><span class="font-bold text-left" dir="ltr" id="ind-cmf">-</span></div>
+</div>
+</div></div><div class="details-section hidden" id="d-liq"><div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100">
+<h4 class="font-bold mb-3 border-b pb-2">محرك السياق والسيولة</h4>
+<div class="space-y-3 text-sm">
+<div class="flex justify-between"><span class="text-gray-600">الاتجاه:</span><span class="font-bold text-left" dir="ltr" id="ctx-regime"></span></div>
+<div class="flex justify-between"><span class="text-gray-600">السيولة:</span><span class="font-bold text-left" dir="ltr" id="liq-grade"></span></div>
+<div class="flex justify-between"><span class="text-gray-600">SmartMoney:</span><span class="font-bold text-left" dir="ltr" id="sm-state"></span></div>
+</div>
+</div></div></div>
+<div class="lg:col-span-2 space-y-6">
+<div class="details-section hidden" id="d-chart"><div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100">
+<h4 class="font-bold mb-4">الرسم البياني</h4>
+<div class="relative h-[300px] w-full">
+<canvas id="priceChart"></canvas>
+</div>
+</div></div><div class="details-section hidden" id="d-alerts"><div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100">
+<h4 class="font-bold mb-4">التنبيهات والمخاطر</h4>
+<div class="space-y-2" id="alerts-container"></div>
+</div></div></div>
+</div>
+</div>
+</main>
+<div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2" id="toast-container"></div>
+<div class="fixed inset-0 bg-white/80 z-50 hidden flex-col items-center justify-center" id="loading-overlay">
+<div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+<p class="mt-4 text-lg font-semibold">جاري التحليل...</p>
+</div>
+<script src="js/version.js"></script><script src="js/storage.js"></script><script src="js/ui.js"></script><script src="js/screenerUI.js"></script><script src="engines/indicators.js"></script><script src="engines/context.js"></script><script src="engines/smartMoney.js"></script><script src="engines/liquidity.js"></script><script src="engines/alerts.js"></script><script src="engines/screener.js"></script><script src="engines/v5.js"></script><script src="engines/offlineLayers.js"></script>
+<script src="engines/crossMarket.js"></script>
+<script src="engines/sectorHeatmap.js"></script>
+<script src="engines/smartMoneyPro.js"></script>
+<script src="engines/iceberg.js"></script>
+<script src="engines/hypeBubble.js"></script>
+<script src="engines/marketRadar.js"></script>
+<script src="engines/patterns.js"></script>
+<script src="engines/riskTimeline.js"></script>
+<script src="engines/portfolioRadar.js"></script>
+<script src="engines/candlesticks.js"></script>
+<script src="engines/compositeSignals.js"></script>
+<script src="engines/decisionRadar.js"></script>
+<script src="engines/watchlistRadar.js"></script>
+<script src="engines/riskControls.js"></script>
+<script src="engines/portfolioGuard.js"></script>
+<script src="engines/liquidityTrap.js"></script>
+<script src="engines/vwapEngine.js"></script>
+<script src="engines/fakeVolumeEngine.js"></script>
+<script src="engines/globalRiskScore.js"></script><script src="js/dataEngine.js"></script><script src="js/decisionEngine.js"></script>
+<script src="js/advancedUI.js"></script><script src="js/analysisEngine.js"></script><script src="charts/chartEngine.js"></script><script src="js/fetchEngine.js"></script><script src="js/v5UI.js"></script><script src="engines/portfolioStress.js"></script><script src="js/portfolioUI.js"></script><script src="engines/fetchLiveEngine.js"></script>
+<script src="js/app.js"></script> <script src="js/portfolioWatch.js"></script>
+</body>
+</html>
